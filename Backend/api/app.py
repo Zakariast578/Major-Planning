@@ -79,9 +79,7 @@ def predict_major(student: StudentData, top_n: int = 3):
 
     predictions = {}
     for name, model in [
-        ("RandomForest", rf_model),
         ("XGBoost", xgb_model),
-        ("StackingEnsemble", stack_model),
     ]:
         # Predict single label
         pred_encoded = model.predict(X_input)[0]
