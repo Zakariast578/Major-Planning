@@ -55,9 +55,7 @@ def load_models():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-    rf_model = joblib.load(os.path.join(MODELS_DIR, "random_forest.pkl"))
     xgb_model = joblib.load(os.path.join(MODELS_DIR, "xgboost.pkl"))
-    stack_model = joblib.load(os.path.join(MODELS_DIR, "stacking_ensemble.pkl"))
     feature_columns = joblib.load(os.path.join(MODELS_DIR, "feature_columns.pkl"))
     label_encoder = joblib.load(os.path.join(MODELS_DIR, "label_encoder.pkl"))
 
