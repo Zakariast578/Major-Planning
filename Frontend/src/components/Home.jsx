@@ -427,7 +427,7 @@ export default function Home() {
                   initial="hidden"
                   animate="visible"
                   variants={staggerCards}
-                  className="grid grid-cols-1 md:grid-cols-3"
+                  className="md:grid-cols-3"
                 >
                   {Object.entries(predictions).map(([modelName, modelData]) => {
                     const sortedTop = [...modelData.top_n].sort(
