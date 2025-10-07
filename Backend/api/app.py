@@ -5,6 +5,10 @@ import pandas as pd
 import numpy as np
 import os
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # -------------------------------
 # 1️⃣ Initialize FastAPI
@@ -14,7 +18,7 @@ app = FastAPI()
 # Enable CORS for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL")],  # frontend URL
+    allow_origins=[os.getenv("FRONTEND_URL") ],  # frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
