@@ -72,7 +72,7 @@ const Navbar = () => {
                             className="group relative overflow-hidden rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-2xl focus-visible:ring-2 focus-visible:ring-indigo-400 dark:focus-visible:ring-indigo-500"
                         >
                             <span className="absolute inset-0 h-full w-full scale-0 rounded-full bg-white/20 opacity-0 transition-all duration-500 group-hover:scale-125 group-hover:opacity-100" />
-                            <span className="relative">Get Started</span>
+                            <span className="relative"><a href="https://zakariasaid.dev/">Get Started</a></span>
                         </Button>
                     </div>
 
