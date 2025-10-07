@@ -1,0 +1,11 @@
+# Unable to list project files. Provide project structure or dependencies.
+fastapi
+uvicorn
+pydantic
+pandas
+numpy
+scikit-learn
+xgboost
+imbalanced-learn
+joblib
+python-multipart

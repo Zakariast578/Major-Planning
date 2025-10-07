@@ -6,22 +6,19 @@ import numpy as np
 import os
 from fastapi.middleware.cors import CORSMiddleware
 
-
 # -------------------------------
 # 1️⃣ Initialize FastAPI
 # -------------------------------
 app = FastAPI()
 
-
 # Enable CORS for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # your frontend URL
+    allow_origins=[os.getenv("FRONTEND_URL")],  # frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # -------------------------------
 # 2️⃣ Global variables (loaded on startup)
@@ -33,7 +30,7 @@ feature_columns = None
 label_encoder = None
 
 # -------------------------------
-# 3️⃣ Define JSON schema (raw inputs only)
+# 3️⃣ Define JSON schema
 # -------------------------------
 class StudentData(BaseModel):
     part_time_job: int
@@ -65,102 +62,48 @@ def load_models():
     label_encoder = joblib.load(os.path.join(MODELS_DIR, "label_encoder.pkl"))
 
 # -------------------------------
-# 5️⃣ Helper function to compute derived features
-
-def compute_features(df):
-    # -------------------------------
-    # 1️⃣ Define subject groups
-    # -------------------------------
-    math_phy = ['math_score', 'physics_score']
-    che_bio = ['chemistry_score', 'biology_score']
-    geo_bio = ['geography_score', 'biology_score']
-    eng_hist = ['english_score', 'history_score']
-
-    # -------------------------------
-    # 2️⃣ Calculate total scores
-    # -------------------------------
-    df['math_physics_total'] = df[math_phy].sum(axis=1)
-    df['chem_biology_total'] = df[che_bio].sum(axis=1)
-    df['geo_biology_total'] = df[geo_bio].sum(axis=1)
-    df['english_history_total'] = df[eng_hist].sum(axis=1)
-    
-    # Overall total score across all subjects
-    df['overall_total_score'] = df[math_phy + che_bio + geo_bio + eng_hist].sum(axis=1)
-
-    # -------------------------------
-    # 3️⃣ Calculate average scores
-    # -------------------------------
-    df['math_physics_avg'] = df[math_phy].mean(axis=1).round(2)
-    df['chem_biology_avg'] = df[che_bio].mean(axis=1).round(2)
-    df['geo_biology_avg'] = df[geo_bio].mean(axis=1).round(2)
-    df['english_history_avg'] = df[eng_hist].mean(axis=1).round(2)
-    df['overall_average_score'] = df[math_phy + che_bio + geo_bio + eng_hist].mean(axis=1).round(2)
-
-    # -------------------------------
-    # 4️⃣ Binary comparison indicators
-    # -------------------------------
-    df['is_higher_math_phy'] = (df['math_physics_total'] > df['chem_biology_total']).astype(int)
-    df['is_higher_che_bio'] = (df['chem_biology_total'] > df['math_physics_total']).astype(int)
-    df['is_higher_non_stem'] = (df[['english_score', 'history_score', 'geography_score']].sum(axis=1) > 255).astype(int)
-    df['is_higher_geo_bio'] = (df['geo_biology_total'] > 180).astype(int)
-    df['is_higher_eng_hist'] = (df['english_history_total'] > 180).astype(int)
-
-    # -------------------------------
-    # 5️⃣ Study efficiency
-    # -------------------------------
-    df['study_efficiency'] = df['weekly_self_study_hours'] / (df['absence_days'] + 1)
-    df['study_efficiency'] = df['study_efficiency'].replace([np.inf, -np.inf], 0).fillna(0).round(2)
-
-    # -------------------------------
-    # 6️⃣ Normalize study efficiency
-    # -------------------------------
-    min_eff = df['study_efficiency'].min()
-    max_eff = df['study_efficiency'].max()
-    if max_eff - min_eff != 0:
-        df['study_efficiency_norm'] = ((df['study_efficiency'] - min_eff) / (max_eff - min_eff)).round(3)
-    else:
-        df['study_efficiency_norm'] = 0.0
-
-    # -------------------------------
-    # Return the full DataFrame; X_input will select correct columns later
-    # -------------------------------
-    return df
-
-
-
-# -------------------------------
-# 6️⃣ Root endpoint
+# 5️⃣ Root endpoint
 # -------------------------------
 @app.get("/")
 def read_root():
     return {"message": "Hello Students! Welcome to the Major Recommendation API."}
 
 # -------------------------------
-# 7️⃣ Prediction endpoint
+# 6️⃣ Prediction endpoint
 # -------------------------------
 @app.post("/predict")
-def predict_major(student: StudentData):
+def predict_major(student: StudentData, top_n: int = 3):
     # Convert input JSON to DataFrame
     df = pd.DataFrame([student.dict()])
-
-    # Compute all derived features
-    df = compute_features(df)
 
     # Ensure only trained feature columns are used
     X_input = df[feature_columns]
 
-    # Make predictions
-    rf_pred = rf_model.predict(X_input)
-    xgb_pred = xgb_model.predict(X_input)
-    stack_pred = stack_model.predict(X_input)
+    predictions = {}
+    for name, model in [
+        ("RandomForest", rf_model),
+        ("XGBoost", xgb_model),
+        ("StackingEnsemble", stack_model),
+    ]:
+        # Predict single label
+        pred_encoded = model.predict(X_input)[0]
+        pred_label = label_encoder.inverse_transform([int(pred_encoded)])[0]
 
-    # Decode numeric labels back to majors
-    rf_label = label_encoder.inverse_transform(rf_pred)[0]
-    xgb_label = label_encoder.inverse_transform(xgb_pred)[0]
-    stack_label = label_encoder.inverse_transform(stack_pred)[0]
+        # Get top N probabilities
+        proba = model.predict_proba(X_input)[0]
+        top_idx = np.argsort(proba)[::-1][:top_n]
+        top_labels = label_encoder.inverse_transform(top_idx)
+        top_probs = proba[top_idx] * 100
 
-    return {
-        "RandomForest": rf_label,
-        "XGBoost": xgb_label,
-        "StackingEnsemble": stack_label
-    }
+        # ✅ Convert NumPy data to native Python types
+        top_n_result = [
+            {"faculty": str(label), "probability": float(prob)}
+            for label, prob in zip(top_labels, top_probs)
+        ]
+
+        predictions[name] = {
+            "predicted_faculty": str(pred_label),
+            "top_n": top_n_result,
+        }
+
+    return predictions
