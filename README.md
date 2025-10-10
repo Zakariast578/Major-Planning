@@ -8,8 +8,8 @@ The web application is live at: https://student-major-al.vercel.app/
 > Note: Only the XGBoost model is deployed due to size constraints. Other models (Random Forest and Stacking Ensemble) are larger (300–400 MB) and are available in the GitHub repository for offline use.
 
 ## Screenshots
-![Home dashboard](screenshots/Home.png)
+<img src="screenshots/Home.png" alt="Home dashboard" />
 
-![Prediction form](screenshots/predict.png)
+<img src="screenshots/predict.png" alt="Prediction form" />
 
-![Prediction results](screenshots/prediction.png)
+<img src="screenshots/prediction.png" alt="Prediction results" />
