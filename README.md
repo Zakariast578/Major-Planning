@@ -6,3 +6,10 @@ This project uses machine learning to recommend suitable university faculties to
 ## Deployment
 The web application is live at: https://student-major-al.vercel.app/
 > Note: Only the XGBoost model is deployed due to size constraints. Other models (Random Forest and Stacking Ensemble) are larger (300–400 MB) and are available in the GitHub repository for offline use.
+
+## Screenshots
+![Home dashboard](screenshots/Home.png)
+
+![Prediction form](screenshots/predict.png)
+
+![Prediction results](screenshots/prediction.png)
