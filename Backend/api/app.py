@@ -62,9 +62,9 @@ def load_models():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-    rf_model = joblib.load(os.path.join(MODELS_DIR, "random_forest.pkl"))
+    # rf_model = joblib.load(os.path.join(MODELS_DIR, "random_forest.pkl"))
     xgb_model = joblib.load(os.path.join(MODELS_DIR, "xgboost.pkl"))
-    stack_model = joblib.load(os.path.join(MODELS_DIR, "stacking_ensemble.pkl"))
+    # stack_model = joblib.load(os.path.join(MODELS_DIR, "stacking_ensemble.pkl"))
     feature_columns = joblib.load(os.path.join(MODELS_DIR, "feature_columns.pkl"))
     label_encoder = joblib.load(os.path.join(MODELS_DIR, "label_encoder.pkl"))
 
@@ -79,11 +79,23 @@ def read_root():
 # 6️⃣ Prediction endpoint
 # -------------------------------
 @app.post("/predict")
+@app.post("/predict")
 def predict_major(student: StudentData, top_n: int = 3):
     # Convert input JSON to DataFrame
     df = pd.DataFrame([student.dict()])
 
-    # Ensure only trained feature columns are used
+    # 🧮 Calculate Total_Score
+    df["Total_Score"] = (
+        df["math_score"]
+        + df["physics_score"]
+        + df["chemistry_score"]
+        + df["biology_score"]
+        + df["english_score"]
+        + df["history_score"]
+        + df["geography_score"]
+    )
+
+    # ✅ Ensure only trained feature columns are used
     X_input = df[feature_columns]
 
     predictions = {}
@@ -102,7 +114,7 @@ def predict_major(student: StudentData, top_n: int = 3):
         top_labels = label_encoder.inverse_transform(top_idx)
         top_probs = proba[top_idx] * 100
 
-        # ✅ Convert NumPy data to native Python types
+        # Convert to native Python types for JSON
         top_n_result = [
             {"faculty": str(label), "probability": float(prob)}
             for label, prob in zip(top_labels, top_probs)
@@ -111,6 +123,7 @@ def predict_major(student: StudentData, top_n: int = 3):
         predictions[name] = {
             "predicted_faculty": str(pred_label),
             "top_n": top_n_result,
+            "Total_Score": float(df["Total_Score"].iloc[0])
         }
 
     return predictions
