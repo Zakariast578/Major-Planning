@@ -1,143 +1,108 @@
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GraduationCap, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Link } from "react-router-dom";
+
 
 const navItems = [
-    { label: "Home", href: "#home" },
-    { label: "About", href: "#about" },
-    { label: "How It Works", href: "#how-it-works" },
+    { label: "Home", href: "/" },
+    { label: "Predict", href: "/predict" },
+    { label: "About", href: "/about" },
+    { label: "How It Works", href: "/how-it-works" },
 ]
+
+const MotionLink = motion(Link)
 
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [isScrolled, setIsScrolled] = useState(false)
-
-    useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 12)
-        handleScroll()
-        window.addEventListener("scroll", handleScroll)
-        return () => window.removeEventListener("scroll", handleScroll)
-    }, [])
 
     return (
         <motion.header
-            initial={{ opacity: 0, y: -24 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ease-in-out ${
-                isScrolled
-                    ? "backdrop-blur-md bg-white/70 dark:bg-gray-900/70 shadow-sm py-3"
-                    : "bg-transparent py-5"
-            }`}
+            className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-lg"
         >
-            <div className="relative">
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-indigo-500/60 via-purple-500/60 to-indigo-500/60 opacity-80" />
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-6 transition-all duration-300 md:px-12">
-                    <motion.a
-                        href="#home"
-                        className="group flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
-                        whileHover={{ scale: 1.03 }}
-                        transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                    >
-                        <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 text-indigo-500 transition duration-300 group-hover:from-indigo-500/30 group-hover:to-pink-500/30 dark:text-indigo-300">
-                            <GraduationCap className="h-5 w-5" />
-                        </span>
-                        <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">
-                            StudentMajor.AI
-                        </span>
-                    </motion.a>
+            <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 lg:px-8">
+                <Link to="/" className="text-lg font-semibold text-cyan-400">
+                    AI Major Predictor
+                </Link>
 
-                    <motion.nav
-                        className="hidden items-center gap-8 text-sm font-medium md:flex"
-                        initial={false}
-                    >
-                        {navItems.map(({ label, href }) => (
-                            <motion.a
-                                key={label}
-                                href={href}
-                                className="relative text-gray-700 transition-all duration-300 hover:text-indigo-600 dark:text-gray-200 dark:hover:text-indigo-400"
-                                whileHover={{ scale: 1.05 }}
-                                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                            >
-                                {label}
-                                <span className="absolute inset-x-0 -bottom-1 h-0.5 scale-x-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 transition-transform duration-300 ease-out group-hover:scale-x-100" />
-                            </motion.a>
-                        ))}
-                    </motion.nav>
-
-                    <div className="hidden items-center md:flex">
-                        <Button
-                            variant="default"
-                            className="group relative overflow-hidden rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-2xl focus-visible:ring-2 focus-visible:ring-indigo-400 dark:focus-visible:ring-indigo-500"
+                <nav className="hidden items-center gap-7 text-sm font-medium text-slate-100 md:flex">
+                    {navItems.map(({ label, href }) => (
+                        <MotionLink
+                            key={href}
+                            to={href}
+                            whileHover={{ y: -2 }}
+                            className="transition-colors hover:text-cyan-400"
                         >
-                            <span className="absolute inset-0 h-full w-full scale-0 rounded-full bg-white/20 opacity-0 transition-all duration-500 group-hover:scale-125 group-hover:opacity-100" />
-                            <span className="relative"><a href="https://zakariasaid.dev/">Get Started</a></span>
-                        </Button>
-                    </div>
+                            {label}
+                        </MotionLink>
+                    ))}
+                </nav>
 
-                    <button
-                        type="button"
-                        aria-label="Toggle menu"
-                        onClick={() => setIsMenuOpen((open) => !open)}
-                        className="inline-flex items-center justify-center rounded-lg border border-indigo-500/20 bg-white/70 p-2 text-gray-700 transition hover:border-indigo-500/40 hover:bg-white dark:border-gray-700/60 dark:bg-gray-900/70 dark:text-gray-200 dark:hover:border-indigo-500/40 md:hidden"
-                    >
-                        {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                    </button>
+                <div className="hidden md:flex">
+                    <Button className="bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-500 text-sm font-semibold text-white shadow-md transition hover:shadow-lg">
+                        Predict Now
+                    </Button>
                 </div>
+
+                <button
+                    type="button"
+                    aria-label="Toggle navigation"
+                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-800 p-2 text-slate-200 transition hover:border-cyan-500 hover:text-cyan-400 md:hidden"
+                >
+                    {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
             </div>
 
             <AnimatePresence>
                 {isMenuOpen && (
                     <motion.div
-                        key="mobile-menu"
-                        initial={{ y: -20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -12, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="mt-3 origin-top md:hidden"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="md:hidden"
                     >
                         <motion.ul
-                            className="mx-4 flex flex-col gap-2 rounded-2xl border border-indigo-500/10 bg-white/90 p-4 shadow-lg backdrop-blur-md dark:border-indigo-500/10 dark:bg-gray-900/80"
                             initial="closed"
                             animate="open"
                             variants={{
-                                open: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } },
+                                open: { transition: { staggerChildren: 0.05 } },
                                 closed: { transition: { staggerChildren: 0.05, staggerDirection: -1 } },
                             }}
+                            className="space-y-2 border-t border-slate-700 bg-slate-900 px-5 py-4 text-sm text-slate-100"
                         >
                             {navItems.map(({ label, href }) => (
                                 <motion.li
-                                    key={label}
+                                    key={href}
                                     variants={{
                                         open: { opacity: 1, y: 0 },
-                                        closed: { opacity: 0, y: -10 },
+                                        closed: { opacity: 0, y: -12 },
                                     }}
                                 >
-                                    <motion.a
-                                        href={href}
+                                    <MotionLink
+                                        to={href}
                                         onClick={() => setIsMenuOpen(false)}
-                                        className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-gray-800 transition-colors duration-300 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-100 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
+                                        className="flex items-center justify-between rounded-md px-3 py-2 transition hover:bg-slate-800 hover:text-cyan-400"
                                     >
                                         {label}
-                                        <span className="h-1 w-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 opacity-80" />
-                                    </motion.a>
+                                        <span className="h-1 w-1 rounded-full bg-cyan-400" />
+                                    </MotionLink>
                                 </motion.li>
                             ))}
                             <motion.li
                                 variants={{
                                     open: { opacity: 1, y: 0 },
-                                    closed: { opacity: 0, y: -10 },
+                                    closed: { opacity: 0, y: -12 },
                                 }}
                             >
                                 <Button
-                                    variant="default"
-                                    className="mt-2 w-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 py-2 text-sm font-semibold text-white shadow-md transition-all duration-300 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-indigo-400 dark:focus-visible:ring-indigo-500"
+                                    className="w-full bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-500 text-sm font-semibold text-white shadow-md transition hover:shadow-lg"
                                     onClick={() => setIsMenuOpen(false)}
                                 >
-                                    Get Started
+                                    Predict Now
                                 </Button>
                             </motion.li>
                         </motion.ul>
