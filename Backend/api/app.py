@@ -18,7 +18,9 @@ app = FastAPI()
 # Enable CORS for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL") ],  # frontend URL
+    allow_origins=[os.getenv("FRONTEND_URL"),
+                   "http://localhost:5173"
+                   ],  # frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +50,7 @@ class StudentData(BaseModel):
     english_score: float
     history_score: float
     geography_score: float
+    
 
 # -------------------------------
 # 4️⃣ Load models on startup
@@ -59,7 +62,9 @@ def load_models():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
+    rf_model = joblib.load(os.path.join(MODELS_DIR, "random_forest.pkl"))
     xgb_model = joblib.load(os.path.join(MODELS_DIR, "xgboost.pkl"))
+    stack_model = joblib.load(os.path.join(MODELS_DIR, "stacking_ensemble.pkl"))
     feature_columns = joblib.load(os.path.join(MODELS_DIR, "feature_columns.pkl"))
     label_encoder = joblib.load(os.path.join(MODELS_DIR, "label_encoder.pkl"))
 
@@ -84,6 +89,8 @@ def predict_major(student: StudentData, top_n: int = 3):
     predictions = {}
     for name, model in [
         ("XGBoost", xgb_model),
+        # ("Random Forest", rf_model),
+        # ("Stacking Ensemble", stack_model),
     ]:
         # Predict single label
         pred_encoded = model.predict(X_input)[0]
