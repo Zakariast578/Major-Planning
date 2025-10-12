@@ -203,42 +203,24 @@ export default function PredictionForm() {
         </div>
 
         {/* Prediction Results */}
-        {prediction && (
+        {prediction?.predictions && (
           <div className="space-y-6">
-            <h2 className="text-slate-200 text-lg font-semibold">Prediction Result</h2>
+            <h2 className="text-slate-200 text-lg font-semibold">Prediction Results</h2>
             <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
-              {Object.entries(prediction).map(([model, result]) => (
-                <div
-                  key={model}
-                  className="group rounded-3xl border border-slate-700/60 bg-slate-900/80 p-6 shadow-[0_20px_60px_-40px_rgba(59,130,246,0.9)] transition hover:border-cyan-400/70 hover:shadow-[0_25px_90px_-45px_rgba(56,189,248,0.65)]"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-slate-100">{model}</h3>
-                    <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
-                      Confidence
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm text-slate-300">
-                    Predicted Faculty:{" "}
-                    <span className="font-semibold text-slate-100">{result.predicted_faculty}</span>
+              {Object.entries(prediction.predictions).map(([model, result]) => (
+                <div key={model} className="p-6 bg-slate-900/80 rounded-xl border border-slate-700/50">
+                  <h3 className="text-xl font-semibold text-slate-100">{model}</h3>
+                  <p className="text-slate-300 mt-2">
+                    Predicted Faculty: <span className="font-bold text-white">{result.predicted_faculty}</span>
                   </p>
-                  <p className="text-sm text-slate-300">
-                    Total Score: <span className="font-semibold text-cyan-300">{result.Total_Score}</span>
-                  </p>
-                  <div className="mt-4 space-y-2">
-                    <h4 className="text-sm font-semibold text-slate-200">Top 3 Probabilities</h4>
-                    <ul className="space-y-1 rounded-2xl border border-slate-800/80 bg-slate-950/30 p-3 text-sm text-slate-300">
-                      {result.top_n.map((item, index) => (
-                        <li
-                          key={index}
-                          className="flex items-center justify-between rounded-xl bg-slate-900/50 px-3 py-2"
-                        >
-                          <span>{item.faculty}</span>
-                          <span className="font-semibold text-cyan-300">{item.probability.toFixed(2)}%</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ul className="mt-3 space-y-1">
+                    {result.top_n.map((item, idx) => (
+                      <li key={idx} className="flex justify-between text-slate-300">
+                        <span>{item.faculty}</span>
+                        <span className="font-semibold text-cyan-400">{item.probability.toFixed(2)}%</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
