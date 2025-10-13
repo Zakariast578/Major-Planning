@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 const API_URL = import.meta.env.VITE_ML_API_URL;
 
@@ -27,23 +28,11 @@ const booleanOptions = [
 ];
 
 const numericFieldRules = {
-  weekly_self_study_hours: {
-    required: "Weekly Self-study Hours required",
-    min: { value: 1, message: "Minimum 1 hour" },
-    max: { value: 36, message: "Maximum 36 hours" },
-  },
-  absence_days: {
-    required: "Absence days is required",
-    min: { value: 1, message: "Minimum 1 day" },
-    max: { value: 36, message: "Maximum 36 days" },
-  },
+  weekly_self_study_hours: { required: "Weekly Self-study Hours required", min: { value: 1, message: "Minimum 1 hour" }, max: { value: 36, message: "Maximum 36 hours" } },
+  absence_days: { required: "Absence days is required", min: { value: 1, message: "Minimum 1 day" }, max: { value: 36, message: "Maximum 36 days" } },
 };
 
-const scoreRules = {
-  required: "Score is required",
-  min: { value: 50, message: "Minimum 50" },
-  max: { value: 100, message: "Maximum 100" },
-};
+const scoreRules = { required: "Score is required", min: { value: 50, message: "Minimum 50" }, max: { value: 100, message: "Maximum 100" } };
 
 export default function PredictionForm() {
   const [prediction, setPrediction] = useState(null);
@@ -69,8 +58,7 @@ export default function PredictionForm() {
     const payload = {
       ...formData,
       part_time_job: formData.part_time_job === "Yes" ? 1 : 0,
-      extracurricular_activities:
-        formData.extracurricular_activities === "Yes" ? 1 : 0,
+      extracurricular_activities: formData.extracurricular_activities === "Yes" ? 1 : 0,
     };
 
     try {
@@ -86,7 +74,7 @@ export default function PredictionForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-16 px-4" id="predict">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-16 px-4">
       <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
         <header className="text-center text-slate-100 space-y-2">
@@ -111,7 +99,7 @@ export default function PredictionForm() {
                     render={({ field }) => (
                       <FormItem className="space-y-2">
                         <FormLabel className="text-slate-200 text-sm">
-                          {fieldName.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+                          {fieldName.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                         </FormLabel>
                         <FormControl>
                           <Select onValueChange={field.onChange} value={field.value}>
@@ -143,7 +131,7 @@ export default function PredictionForm() {
                     render={({ field }) => (
                       <FormItem className="space-y-2">
                         <FormLabel className="text-slate-200 text-sm">
-                          {fieldName.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+                          {fieldName.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                         </FormLabel>
                         <FormControl>
                           <Input
@@ -167,10 +155,7 @@ export default function PredictionForm() {
                     key={subject}
                     control={form.control}
                     name={`${subject}_score`}
-                    rules={{
-                      ...scoreRules,
-                      required: `${subject.charAt(0).toUpperCase() + subject.slice(1)} score is required`,
-                    }}
+                    rules={{ ...scoreRules, required: `${subject.charAt(0).toUpperCase() + subject.slice(1)} score is required` }}
                     render={({ field }) => (
                       <FormItem className="space-y-2">
                         <FormLabel className="text-slate-200 text-sm">
@@ -202,28 +187,61 @@ export default function PredictionForm() {
           </Form>
         </div>
 
-        {/* Prediction Results */}
-        {prediction?.predictions && (
-          <div className="space-y-6">
-            <h2 className="text-slate-200 text-lg font-semibold">Prediction Results</h2>
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
-              {Object.entries(prediction.predictions).map(([model, result]) => (
-                <div key={model} className="p-6 bg-slate-900/80 rounded-xl border border-slate-700/50">
-                  <h3 className="text-xl font-semibold text-slate-100">{model}</h3>
-                  <p className="text-slate-300 mt-2">
-                    Predicted Faculty: <span className="font-bold text-white">{result.predicted_faculty}</span>
-                  </p>
-                  <ul className="mt-3 space-y-1">
-                    {result.top_n.map((item, idx) => (
-                      <li key={idx} className="flex justify-between text-slate-300">
-                        <span>{item.faculty}</span>
-                        <span className="font-semibold text-cyan-400">{item.probability.toFixed(2)}%</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+        {/* ------------------------- */}
+{/* Prediction Results */}
+{/* ------------------------- */}
+{loading && (
+  <div className="flex justify-center items-center mt-8">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-cyan-400 border-b-4"></div>
+    <span className="ml-4 text-cyan-400 text-lg font-semibold">
+      Prediction results...
+    </span>
+  </div>
+)}
+
+{!loading && prediction && (
+  <div className="space-y-6 mt-6">
+    {Object.entries(prediction.predictions).map(([name, result]) => (
+      <Card
+        key={name}
+        className="bg-slate-900 border border-cyan-700/40 shadow-lg"
+      >
+        <CardHeader>
+          <CardTitle className="text-cyan-400">Recommended Faculty</CardTitle>
+          <CardDescription className="text-slate-300 font-bold">
+            {result.predicted_faculty}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {result.top_n?.length > 0 && (
+            <ul className="space-y-2">
+              {result.top_n.map((item, idx) => (
+                <li
+                  key={idx}
+                  className={`flex justify-between items-center px-4 py-2 rounded-lg transition-colors ${
+                    idx === 0
+                      ? "bg-cyan-500/20 font-bold text-white"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  <span>{item.faculty}</span>
+                  <span className="font-semibold text-cyan-400">
+                    {(item.probability).toFixed(2)}%
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+)}
+
+
+        {!loading && !prediction && (
+          <div className="text-center text-sm text-slate-400 mt-4">
+            Note: Predictions are based on historical data and may not guarantee future outcomes.
           </div>
         )}
       </div>
