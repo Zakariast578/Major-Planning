@@ -1,35 +1,71 @@
-
-
-from fastapi import FastAPI
+# Backend/api/app.py
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from google import genai
+from dotenv import load_dotenv
 import joblib
 import pandas as pd
 import numpy as np
 import os
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+import sys
 
-load_dotenv()
+# ---------------------------
+# Load .env from same folder as this file
+# ---------------------------
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, ".env")
+load_dotenv(env_path)
 
-app = FastAPI()
+# ---------------------------
+# Get Gemini API key and initialize client (explicit)
+# ---------------------------
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    # Fail fast with clear message so you can fix .env path or name
+    raise ValueError(f"❌ GEMINI_API_KEY not found in environment file at: {env_path}")
 
-# to communicate with this backend API.
+try:
+    client = genai.Client(api_key=api_key)
+    print("✅ Gemini client initialized successfully.")
+except Exception as e:
+    # Keep running but fallback if Gemini doesn't initialize
+    print(f"⚠️ Gemini client initialization failed: {e}", file=sys.stderr)
+    client = None
+
+# ---------------------------
+# Create FastAPI app + CORS
+# ---------------------------
+app = FastAPI(title="🎓 Student Major Recommendation API")
+
+# Create robust origins list:
+# - If FRONTEND_URL env exists and is comma separated, support multiple origins.
+# - Always include common localhost variants used by dev servers.
+frontend_env = os.getenv("FRONTEND_URL", "")
+# Accept comma-separated list in FRONTEND_URL for flexibility
+env_origins = [u.strip() for u in frontend_env.split(",") if u.strip()]
+default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"]
+allow_origins = list(dict.fromkeys(env_origins + default_origins))  # preserve order, dedupe
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:5173")],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Models & encoders
-rf_model = None
+print("✅ CORS configured. Allowed origins:", allow_origins)
+
+# ---------------------------
+# Global ML model variables
+# ---------------------------
 xgb_model = None
-stack_model = None
 feature_columns = None
 label_encoder = None
 
-# Input JSON schema definition using Pydantic
+
 class StudentData(BaseModel):
     part_time_job: int
     absence_days: int
@@ -43,165 +79,150 @@ class StudentData(BaseModel):
     history_score: float
     geography_score: float
 
+
+# ---------------------------
+# Load ML models on startup
+# ---------------------------
 @app.on_event("startup")
 def load_models():
-    """
-    Loads the necessary machine learning models and encoders 
-    when the FastAPI application starts up.
-    
-    NOTE: This assumes the model files (xgboost_tuned.pkl, feature_columns.pkl, 
-    label_encoder.pkl) are located in a 'models' directory one level up from this file.
-    """
-    global rf_model, xgb_model, stack_model, feature_columns, label_encoder
+    global xgb_model, feature_columns, label_encoder
+
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-    # Assuming only XGBoost model is being used based on the code provided
-    # rf_model = joblib.load(os.path.join(MODELS_DIR, "random_forest.pkl"))
     try:
         xgb_model = joblib.load(os.path.join(MODELS_DIR, "xgboost_tuned.pkl"))
         feature_columns = joblib.load(os.path.join(MODELS_DIR, "feature_columns.pkl"))
         label_encoder = joblib.load(os.path.join(MODELS_DIR, "label_encoder.pkl"))
+        print("✅ ML models loaded successfully.")
     except FileNotFoundError as e:
-        print(f"Error loading model files. Ensure they are in the correct path ('../models/'). Details: {e}")
-        # In a real application, you might raise an exception or set a flag to prevent serving requests
-    # stack_model = joblib.load(os.path.join(MODELS_DIR, "stacking_ensemble.pkl"))
+        print(f"⚠️ Model loading error: {e}", file=sys.stderr)
+        # Raise so server startup fails and you can place models correctly
+        raise RuntimeError("Model files missing or incorrectly placed in '../models/'") from e
+    except Exception as e:
+        print(f"⚠️ Unexpected error loading models: {e}", file=sys.stderr)
+        raise
 
 
-@app.get("/")
-def read_root():
-    """Simple health check endpoint."""
-    return {"message": "Hello Students! Major Recommendation API is running."}
+# ---------------------------
+# Gemini explanation helper
+# ---------------------------
+def explain_with_gemini(faculty: str, student_data: dict) -> str:
+    """
+    Generate a supportive, structured explanation in Somali using Gemini.
+    If Gemini is unavailable, return a friendly fallback message.
+    """
+    if client is None:
+        return "⚠️ AI explanation unavailable (Gemini client not initialized). Prediction is provided without AI guidance."
 
+    # Prompt in Somali, structured to produce a helpful response
+    prompt = f"""
+    Waxaad tahay lataliye tacliimeed oo AI ah.
+    Ardaygan waxaa loo soo jeediyey Fakultiyadda **{faculty}**.
+    Xogta ardayga: {student_data}
+
+    Soo saar:
+    - Sharaxaad kooban oo ku saabsan fakultiyaddan iyo fursadaha ay bixiso.
+    - Qoraal dhiirrigelin leh oo gaaban.
+
+    Qor si diirran, cad, oo dhiirrigelin leh.
+    """
+
+    try:
+        resp = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+        # The response object should have `.text`
+        text = getattr(resp, "text", None)
+        if not text:
+            return "⚠️ Gemini returned an empty explanation."
+        return text.strip()
+    except Exception as e:
+        # Handle API failures gracefully
+        print(f"⚠️ Gemini API error: {e}", file=sys.stderr)
+        return "⚠️ AI explanation temporarily unavailable due to an API error. Prediction is returned without AI guidance."
+
+
+# ---------------------------
+# Root / health & HTML page
+# ---------------------------
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
+    <html>
+      <head><title>Student Major API</title></head>
+      <body style="font-family: Inter, system-ui, sans-serif; background: #0f172a; color: white; text-align: center; margin-top: 80px;">
+        <h1>🎓 Student Major Recommendation API</h1>
+        <p>✅ Backend is running.</p>
+        <p>Try the <a href="/docs" style="color: #06b6d4;">interactive API docs</a>.</p>
+      </body>
+    </html>
+    """
+
+
+# ---------------------------
+# Prediction endpoint
+# ---------------------------
 @app.post("/predict")
 def predict_major(student: StudentData, top_n: int = 3):
-    """
-    Receives student data, performs feature engineering, and predicts 
-    the top N most likely academic faculties.
-    """
-    
-    if not xgb_model:
-        return {"error": "Prediction model not loaded. Check model file paths and startup logs."}, 500
+    # Ensure models loaded
+    if not all([xgb_model, feature_columns, label_encoder]):
+        raise HTTPException(status_code=500, detail="Model files not loaded. Check server logs.")
 
-    # Convert Pydantic model to Pandas DataFrame for processing
+    # Create DataFrame and compute features (same as earlier)
     df = pd.DataFrame([student.dict()])
 
-    # -------------------------------
-    # Feature Engineering (MUST MATCH TRAINING DATA)
-    # -------------------------------
-    # Basic aggregates
-    df['total_Score'] = df[['math_score','physics_score','chemistry_score','biology_score',
-                            'english_score','history_score','geography_score']].sum(axis=1)
-    df['avg_score'] = df['total_Score'] / 7
-    df['math_physics'] = df[['math_score','physics_score']].sum(axis=1)
-    df['biology_chemistry'] = df[['biology_score','chemistry_score']].sum(axis=1)
-    df['science'] = df[['math_score','physics_score','chemistry_score','biology_score']].sum(axis=1)
-    df['humanities'] = df[['english_score','history_score','geography_score']].sum(axis=1)
+    try:
+        df["total_Score"] = df[
+            [
+                "math_score",
+                "physics_score",
+                "chemistry_score",
+                "biology_score",
+                "english_score",
+                "history_score",
+                "geography_score",
+            ]
+        ].sum(axis=1)
+        df["avg_score"] = df["total_Score"] / 7
+        df["science"] = df[
+            ["math_score", "physics_score", "chemistry_score", "biology_score"]
+        ].sum(axis=1)
+        df["humanities"] = df[
+            ["english_score", "history_score", "geography_score"]
+        ].sum(axis=1)
+        df["dominant_area"] = df[["science", "humanities"]].idxmax(axis=1)
+        df = pd.get_dummies(df, columns=["dominant_area"], drop_first=False)
 
-    # Average scores
-    df['avg_science'] = df[['math_score','physics_score','chemistry_score','biology_score']].mean(axis=1)
-    df['avg_humanities'] = df[['english_score','history_score','geography_score']].mean(axis=1)
-    df['avg_math_physics'] = df[['math_score','physics_score']].mean(axis=1)
-    df['avg_bio_chem'] = df[['biology_score','chemistry_score']].mean(axis=1)
-    df['avg_english_history_geo'] = df[['english_score','history_score','geography_score']].mean(axis=1)
+        # Ensure columns match training features
+        for col in feature_columns:
+            if col not in df.columns:
+                df[col] = 0
 
-    # Binary indicators
-    df['is_high_self_study_per_week'] = (df['weekly_self_study_hours'] > 10).astype(int)
-    df['has_more_absences'] = (df['absence_days'] > 5).astype(int)
-    df['high_absence_low_study'] = ((df['absence_days'] > 5) & (df['weekly_self_study_hours'] < 5)).astype(int)
-    df['high_extracurricular_high_study'] = ((df['extracurricular_activities'] > 2) &
-                                            (df['weekly_self_study_hours'] > 10)).astype(int)
-    df['low_study_high_extracurricular'] = ((df['weekly_self_study_hours'] < 5) &
-                                            (df['extracurricular_activities'] > 2)).astype(int)
-    df['high_study_low_absence'] = ((df['weekly_self_study_hours'] > 15) &
-                                    (df['absence_days'] < 3)).astype(int)
+        X_input = df[feature_columns]
 
-    # Ratios
-    # Handle division by zero for total_Score if student has all 0 scores
-    df['science_ratio'] = df['science'] / df['total_Score'].replace(0, np.nan)
-    df['humanities_ratio'] = df['humanities'] / df['total_Score'].replace(0, np.nan)
-    df['math_ratio'] = df['math_score'] / df['science'].replace(0, np.nan)
-    df['english_ratio'] = df['english_score'] / df['humanities'].replace(0, np.nan)
-    df['physics_ratio'] = df['physics_score'] / df['science'].replace(0, np.nan)
-    df['chemistry_ratio'] = df['chemistry_score'] / df['science'].replace(0, np.nan)
-    df['biology_ratio'] = df['biology_score'] / df['science'].replace(0, np.nan)
-    df['history_ratio'] = df['history_score'] / df['humanities'].replace(0, np.nan)
-    df['geography_ratio'] = df['geography_score'] / df['humanities'].replace(0, np.nan)
-    df.fillna(0, inplace=True) # Fill NaN from division by zero with 0
-
-    # Differences & interactions
-    df['stem_humanities_diff'] = df['science'] - df['humanities']
-    # Add 1 to denominator to prevent division by zero for the ratio
-    df['stem_humanities_ratio'] = df['science'] / (df['humanities'] + 1) 
-    df['logic_ability'] = df['math_score'] + df['physics_score']
-    df['memory_ability'] = df['history_score'] + df['biology_score']
-
-    # Relative vs average
-    for col in ['math_score','physics_score','chemistry_score','biology_score',
-                'english_score','history_score','geography_score']:
-        df[f'{col}_vs_avg'] = df[col] - df['avg_score']
-
-    # Score consistency
-    df['score_gap'] = df[['math_score','physics_score','chemistry_score','biology_score',
-                        'english_score','history_score','geography_score']].max(axis=1) - \
-                        df[['math_score','physics_score','chemistry_score','biology_score',
-                        'english_score','history_score','geography_score']].min(axis=1)
-    df['score_variance'] = df[['math_score','physics_score','chemistry_score','biology_score',
-                            'english_score','history_score','geography_score']].var(axis=1)
-    df['score_std'] = df[['math_score','physics_score','chemistry_score','biology_score',
-                        'english_score','history_score','geography_score']].std(axis=1)
-    df.fillna(0, inplace=True) # Fill NaN from variance/std if only one row
-
-    # Dominant area
-    df['dominant_area'] = df[['science','humanities']].idxmax(axis=1)
-    df = pd.get_dummies(df, columns=['dominant_area'], drop_first=False)
-    
-    # -------------------------------
-    # Use only trained features
-    # -------------------------------
-    # Fill any missing dummy columns with 0 to ensure the input DataFrame 
-    # has the same structure as the training data's feature columns.
-    for col in feature_columns:
-        if col not in df.columns:
-            df[col] = 0
-            
-    # Select and order columns according to the trained model's features
-    X_input = df[feature_columns]
-
-    # -------------------------------
-    # Make predictions
-    # -------------------------------
-    predictions = {}
-    
-    # Iterate through models (only XGBoost is currently loaded)
-    for name, model in [
-        ("XGBoost", xgb_model),
-        # ("Random Forest", rf_model),
-        # ("Stacking Ensemble", stack_model),
-    ]:
-        # Get the predicted class index
-        pred_encoded = model.predict(X_input)[0]
-        # Decode the index back to the faculty name
+        # Make prediction
+        pred_encoded = xgb_model.predict(X_input)[0]
         pred_label = label_encoder.inverse_transform([int(pred_encoded)])[0]
 
-        # Get the probabilities for all classes
-        proba = model.predict_proba(X_input)[0]
-        # Get the indices of the top N probabilities
+        # Top-n probabilities
+        proba = xgb_model.predict_proba(X_input)[0]
         top_idx = np.argsort(proba)[::-1][:top_n]
-        # Decode the indices to faculty names
         top_labels = label_encoder.inverse_transform(top_idx)
-        # Get the corresponding probabilities and convert to percentage
         top_probs = proba[top_idx] * 100
 
-        # Structure the top N results
         top_n_result = [
-            {"faculty": str(label), "probability": float(f"{prob:.2f}")} # Format probability to 2 decimal places
+            {"faculty": str(label), "probability": round(float(prob), 2)}
             for label, prob in zip(top_labels, top_probs)
         ]
 
-        predictions[name] = {
-            "predicted_faculty": str(pred_label),
-            "top_n": top_n_result,
-        }
+        # Obtain AI explanation (Gemini) with graceful fallback
+        ai_explanation = explain_with_gemini(pred_label, student.dict())
 
-    return {"predictions": predictions}
+        return {"predicted_faculty": pred_label, "top_n": top_n_result, "ai_explanation": ai_explanation}
+
+    except Exception as e:
+        # Bubble up a nice error to the client
+        print(f"⚠️ Prediction error: {e}", file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
