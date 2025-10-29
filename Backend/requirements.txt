@@ -1,11 +1,7 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-pydantic
-
-xgboost
 joblib
 pandas
 numpy
-
 google-genai
