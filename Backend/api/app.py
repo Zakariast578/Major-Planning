@@ -1,7 +1,5 @@
-# Backend/api/app.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from google import genai
 from dotenv import load_dotenv
@@ -12,41 +10,39 @@ import os
 import sys
 
 # ---------------------------
-# Load .env from same folder as this file
+# Load .env from same folder
 # ---------------------------
 current_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(current_dir, ".env")
 load_dotenv(env_path)
 
 # ---------------------------
-# Get Gemini API key and initialize client (explicit)
+# Gemini API setup
 # ---------------------------
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    # Fail fast with clear message so you can fix .env path or name
-    raise ValueError(f"❌ GEMINI_API_KEY not found in environment file at: {env_path}")
+    raise ValueError(f"❌ GEMINI_API_KEY not found in .env file at: {env_path}")
 
 try:
     client = genai.Client(api_key=api_key)
     print("✅ Gemini client initialized successfully.")
 except Exception as e:
-    # Keep running but fallback if Gemini doesn't initialize
     print(f"⚠️ Gemini client initialization failed: {e}", file=sys.stderr)
     client = None
 
 # ---------------------------
-# Create FastAPI app + CORS
+# FastAPI + CORS setup
 # ---------------------------
 app = FastAPI(title="🎓 Student Major Recommendation API")
 
-# Create robust origins list:
-# - If FRONTEND_URL env exists and is comma separated, support multiple origins.
-# - Always include common localhost variants used by dev servers.
 frontend_env = os.getenv("FRONTEND_URL", "")
-# Accept comma-separated list in FRONTEND_URL for flexibility
 env_origins = [u.strip() for u in frontend_env.split(",") if u.strip()]
-default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"]
-allow_origins = list(dict.fromkeys(env_origins + default_origins))  # preserve order, dedupe
+default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
+allow_origins = list(dict.fromkeys(env_origins + default_origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +55,7 @@ app.add_middleware(
 print("✅ CORS configured. Allowed origins:", allow_origins)
 
 # ---------------------------
-# Global ML model variables
+# Global variables for models
 # ---------------------------
 xgb_model = None
 feature_columns = None
@@ -97,7 +93,6 @@ def load_models():
         print("✅ ML models loaded successfully.")
     except FileNotFoundError as e:
         print(f"⚠️ Model loading error: {e}", file=sys.stderr)
-        # Raise so server startup fails and you can place models correctly
         raise RuntimeError("Model files missing or incorrectly placed in '../models/'") from e
     except Exception as e:
         print(f"⚠️ Unexpected error loading models: {e}", file=sys.stderr)
@@ -108,14 +103,10 @@ def load_models():
 # Gemini explanation helper
 # ---------------------------
 def explain_with_gemini(faculty: str, student_data: dict) -> str:
-    """
-    Generate a supportive, structured explanation in Somali using Gemini.
-    If Gemini is unavailable, return a friendly fallback message.
-    """
+    """Generate Somali explanation with Gemini AI."""
     if client is None:
-        return "⚠️ AI explanation unavailable (Gemini client not initialized). Prediction is provided without AI guidance."
+        return "⚠️ AI explanation unavailable (Gemini client not initialized)."
 
-    # Prompt in Somali, structured to produce a helpful response
     prompt = f"""
     Waxaad tahay lataliye tacliimeed oo AI ah.
     Ardaygan waxaa loo soo jeediyey Fakultiyadda **{faculty}**.
@@ -133,32 +124,21 @@ def explain_with_gemini(faculty: str, student_data: dict) -> str:
             model="gemini-2.0-flash",
             contents=prompt
         )
-        # The response object should have `.text`
         text = getattr(resp, "text", None)
         if not text:
             return "⚠️ Gemini returned an empty explanation."
         return text.strip()
     except Exception as e:
-        # Handle API failures gracefully
         print(f"⚠️ Gemini API error: {e}", file=sys.stderr)
-        return "⚠️ AI explanation temporarily unavailable due to an API error. Prediction is returned without AI guidance."
+        return "⚠️ AI explanation temporarily unavailable due to an API error."
 
 
 # ---------------------------
-# Root / health & HTML page
+# Root health check
 # ---------------------------
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return """
-    <html>
-      <head><title>Student Major API</title></head>
-      <body style="font-family: Inter, system-ui, sans-serif; background: #0f172a; color: white; text-align: center; margin-top: 80px;">
-        <h1>🎓 Student Major Recommendation API</h1>
-        <p>✅ Backend is running.</p>
-        <p>Try the <a href="/docs" style="color: #06b6d4;">interactive API docs</a>.</p>
-      </body>
-    </html>
-    """
+@app.api_route("/", methods=["GET", "HEAD"])
+def health_check():
+    return {"status": "ok", "message": "✅ Student Major API is running"}
 
 
 # ---------------------------
@@ -166,14 +146,13 @@ def home():
 # ---------------------------
 @app.post("/predict")
 def predict_major(student: StudentData, top_n: int = 3):
-    # Ensure models loaded
     if not all([xgb_model, feature_columns, label_encoder]):
-        raise HTTPException(status_code=500, detail="Model files not loaded. Check server logs.")
+        raise HTTPException(status_code=500, detail="Model files not loaded.")
 
-    # Create DataFrame and compute features (same as earlier)
     df = pd.DataFrame([student.dict()])
 
     try:
+        # Feature engineering
         df["total_Score"] = df[
             [
                 "math_score",
@@ -195,18 +174,17 @@ def predict_major(student: StudentData, top_n: int = 3):
         df["dominant_area"] = df[["science", "humanities"]].idxmax(axis=1)
         df = pd.get_dummies(df, columns=["dominant_area"], drop_first=False)
 
-        # Ensure columns match training features
+        # Match feature columns
         for col in feature_columns:
             if col not in df.columns:
                 df[col] = 0
 
         X_input = df[feature_columns]
 
-        # Make prediction
+        # Predict
         pred_encoded = xgb_model.predict(X_input)[0]
         pred_label = label_encoder.inverse_transform([int(pred_encoded)])[0]
 
-        # Top-n probabilities
         proba = xgb_model.predict_proba(X_input)[0]
         top_idx = np.argsort(proba)[::-1][:top_n]
         top_labels = label_encoder.inverse_transform(top_idx)
@@ -217,12 +195,14 @@ def predict_major(student: StudentData, top_n: int = 3):
             for label, prob in zip(top_labels, top_probs)
         ]
 
-        # Obtain AI explanation (Gemini) with graceful fallback
         ai_explanation = explain_with_gemini(pred_label, student.dict())
 
-        return {"predicted_faculty": pred_label, "top_n": top_n_result, "ai_explanation": ai_explanation}
+        return {
+            "predicted_faculty": pred_label,
+            "top_n": top_n_result,
+            "ai_explanation": ai_explanation,
+        }
 
     except Exception as e:
-        # Bubble up a nice error to the client
         print(f"⚠️ Prediction error: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
