@@ -105,8 +105,8 @@ export default function PredictionForm() {
         >
           <h1 className="text-4xl font-bold">Student Major Prediction</h1>
           <p className="text-slate-400 max-w-2xl mx-auto">
-            Enter your academic performance to get your recommended university
-            faculty — powered by ML and Gemini AI insights.
+            Enter academic metrics to forecast your most suitable university
+            faculty using trained ML models.
           </p>
         </motion.header>
 
@@ -114,7 +114,7 @@ export default function PredictionForm() {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
           className="rounded-3xl border border-slate-800 bg-slate-950/70 p-8 shadow-[0_35px_120px_-60px_rgba(56,189,248,0.6)] backdrop-blur"
         >
           <Form {...form}>
@@ -261,71 +261,68 @@ export default function PredictionForm() {
           </div>
         )}
 
-        {/* ✅ RESULT SECTION */}
+        {/* PREDICTION RESULT */}
         {!loading && prediction && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="space-y-10 mt-10"
-          >
-            {/* 🎓 Faculty Info */}
-            <Card className="bg-slate-950 border border-cyan-600/30 shadow-[0_25px_80px_-35px_rgba(56,189,248,0.4)]">
-              <CardHeader>
-                <CardTitle className="text-2xl text-cyan-400">
-                  🎓 Recommended Faculty
-                </CardTitle>
-                <CardDescription className="text-lg text-slate-200">
-                  {prediction.predicted_faculty}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {prediction.top_n.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className={`flex justify-between items-center px-4 py-2 rounded-xl ${
-                        idx === 0
-                          ? "bg-cyan-500/20 font-semibold text-white"
-                          : "bg-slate-800/70 text-slate-300"
-                      }`}
-                    >
-                      <span>{item.faculty}</span>
-                      <span className="text-cyan-400 font-semibold">
-                        {item.probability.toFixed(2)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.7 }}
+    className="grid gap-6 mt-8 md:grid-cols-2 lg:grid-cols-3"
+  >
+    {Object.entries(prediction.predictions).map(([modelName, result], index) => (
+      <motion.div
+        key={modelName}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.15, duration: 0.6 }}
+      >
+        <Card className="bg-slate-950 border border-cyan-600/30 shadow-[0_20px_60px_-30px_rgba(56,189,248,0.4)] hover:scale-[1.02] transition-transform">
+          <CardHeader>
+            <CardTitle className="text-cyan-400 text-lg flex items-center justify-between">
+              <span className="capitalize">{modelName.replace(/_/g, " ")}</span>
+              <span className="text-xs text-slate-400">Model</span>
+            </CardTitle>
+            <CardDescription className="text-slate-100 text-base font-semibold">
+              🎯 Predicted Faculty:{" "}
+              <span className="text-cyan-400">{result.predicted_faculty}</span>
+            </CardDescription>
+          </CardHeader>
 
-            {/* 💡 Gemini AI Explanation */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-cyan-600/20 shadow-[0_20px_60px_-25px_rgba(56,189,248,0.25)] p-6">
-                <CardHeader>
-                  <CardTitle className="text-xl text-cyan-400 flex items-center gap-2">
-                    <span>💬 AI Guidance from Gemini</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-line leading-relaxed text-slate-200 text-base">
-                    {prediction.ai_explanation}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
+          <CardContent>
+            {result.top_n && result.top_n.length > 0 ? (
+              <ul className="space-y-2">
+                {result.top_n.map((item, idx) => (
+                  <li
+                    key={idx}
+                    className={`flex justify-between items-center px-4 py-2 rounded-xl transition-all ${
+                      idx === 0
+                        ? "bg-cyan-500/20 text-white font-semibold"
+                        : "bg-slate-800/70 hover:bg-slate-700/60 text-slate-300"
+                    }`}
+                  >
+                    <span>{item.faculty}</span>
+                    <span className="text-cyan-400 font-semibold">
+                      {item.probability.toFixed(2)}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-400 text-sm italic">
+                No detailed predictions available.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    ))}
+  </motion.div>
+)}
+
 
         {!loading && !prediction && (
           <div className="text-center text-sm text-slate-400">
-            ⚙️ Predictions are based on trained models and AI insights for
-            guidance only.
+            ⚙️ Predictions are based on trained data and provide advisory insights only.
           </div>
         )}
       </div>
